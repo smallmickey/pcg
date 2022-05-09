@@ -14,7 +14,7 @@ from helper_code import *
 from team_code import load_challenge_model, run_challenge_model
 import os
 #os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+#os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 # Run model.
 def run_model(model_folder, data_folder, output_folder, allow_failures, verbose):
     # Load models.

@@ -8,6 +8,8 @@
 # Import libraries and functions. You can change or remove them.
 #
 ################################################################################
+from tensorflow.python.keras.optimizers import SGD
+from tensorflow.python.keras.regularizers import l2
 
 from helper_code import *
 import numpy as np, scipy as sp, scipy.stats, os, sys, joblib
@@ -22,6 +24,31 @@ import librosa
 from scipy.fftpack import next_fast_len
 from scipy.signal import spectrogram
 import matplotlib.pyplot as plt
+
+from scipy import signal
+from python_speech_features import mfcc
+from python_speech_features import delta
+from python_speech_features import logfbank
+
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import *
+
+
+#import samplerate
+import math
+def band_pass_filter(original_signal, order, fc1,fc2, fs):
+    '''
+    中值滤波器
+    :param original_signal: 音频数据
+    :param order: 滤波器阶数
+    :param fc1: 截止频率
+    :param fc2: 截止频率
+    :param fs: 音频采样率
+    :return: 滤波后的音频数据
+    '''
+    b, a = signal.butter(N=order, Wn=[2*fc1/fs,2*fc2/fs], btype='bandpass')
+    new_signal = signal.lfilter(b, a, original_signal)
+    return new_signal
 
 def __get_norm(norm):
     if norm == 0 or norm is None:
@@ -261,82 +288,75 @@ def plot_polycoherence(freq1, freq2, bicoh):
 #
 ################################################################################
 def build_model_1():
-    inputdata = keras.Input(shape=(1024,256,1))
+    inputdata = keras.Input(shape=(49, 39, 1))
 
-    final = keras.layers.Conv2D(128,(3,3), padding="same",activation='relu')(inputdata)
+    final = keras.layers.Conv2D(32, (3, 3), padding="valid", kernel_initializer='random_uniform')(inputdata)
+    final = keras.layers.PReLU()(final)
+    final = keras.layers.MaxPooling2D((2, 2), strides=(2, 2))(final)
     final = keras.layers.BatchNormalization()(final)
-    final = keras.layers.ReLU()(final)
-    final = keras.layers.MaxPooling2D((2,2), strides=(2,2))(final)
-    final = keras.layers.Dropout(rate=0.2)(final)
 
-    final = keras.layers.Conv2D(64,(3,3), padding="same",activation='relu')(final)
+    final = keras.layers.Conv2D(32, (3, 3), padding="valid")(final)
+    final = keras.layers.PReLU()(final)
+    final = keras.layers.MaxPooling2D((4, 4))(final)
     final = keras.layers.BatchNormalization()(final)
-    final = keras.layers.ReLU()(final)
-    final = keras.layers.MaxPooling2D((2,2), strides=(2,2) )(final)
-    final = keras.layers.Dropout(rate=0.2)(final)
 
-    final = keras.layers.Conv2D(16,(3,3), padding="same",activation='relu')(final)
+    final = keras.layers.Conv2D(64, (3, 3), padding="valid")(final)
+    final = keras.layers.ReLU()(final)
+    final = keras.layers.MaxPooling2D((2, 2), strides=(2, 2))(final)
     final = keras.layers.BatchNormalization()(final)
-    final = keras.layers.ReLU()(final)
-    final = keras.layers.MaxPooling2D((2,2), strides=(2,2))(final)
-    final = keras.layers.Dropout(rate=0.2)(final)
 
-    final = keras.layers.Conv2D(16, (3,3), padding="same",activation='relu')(final)
-    final = keras.layers.BatchNormalization()(final)
-    final = keras.layers.ReLU()(final)
-
-
+    final = keras.layers.Reshape((1,64))(final)
+    final = keras.layers.GRU(64)(final)
     final = keras.layers.Flatten()(final)
+    final = keras.layers.Dropout(0.5)(final)
+    final = keras.layers.Dense(32)(final)
     final = keras.layers.Dense(3)(final)
-    final = keras.layers.BatchNormalization()(final)
     final = keras.layers.Softmax()(final)
 
     model = keras.Model(inputs=inputdata, outputs=final)
     optimizer = keras.optimizers.Adam(
-        lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=None)
+        lr=0.001, decay=1e-6, epsilon=None)
     model.compile(loss='categorical_crossentropy',
                   optimizer=optimizer,
                   metrics=['accuracy'])
-    # print(model.summary())
+    print(model.summary())
+
+
+
     return model
 def build_model_2():
-    inputdata = keras.Input(shape=(1024,256,1))
+    inputdata = keras.Input(shape=(49, 39, 1))
 
-    final = keras.layers.Conv2D(128,(3,3), padding="same",activation='relu')(inputdata)
+    final = keras.layers.Conv2D(32, (3, 3), padding="valid", kernel_initializer='random_uniform')(inputdata)
+    final = keras.layers.PReLU()(final)
+    final = keras.layers.MaxPooling2D((2, 2), strides=(2, 2))(final)
     final = keras.layers.BatchNormalization()(final)
-    final = keras.layers.ReLU()(final)
-    final = keras.layers.MaxPooling2D((2,2), strides=(2,2))(final)
 
-
-    final = keras.layers.Conv2D(64,(3,3), padding="same",activation='relu')(final)
+    final = keras.layers.Conv2D(32, (3, 3), padding="valid")(final)
+    final = keras.layers.PReLU()(final)
+    final = keras.layers.MaxPooling2D((4, 4))(final)
     final = keras.layers.BatchNormalization()(final)
-    final = keras.layers.ReLU()(final)
-    final = keras.layers.MaxPooling2D((2,2), strides=(2,2) )(final)
-    final = keras.layers.Dropout(rate=0.2)(final)
 
-    final = keras.layers.Conv2D(16,(3,3), padding="same",activation='relu')(final)
+    final = keras.layers.Conv2D(64, (3, 3), padding="valid")(final)
+    final = keras.layers.ReLU()(final)
+    final = keras.layers.MaxPooling2D((2, 2), strides=(2, 2))(final)
     final = keras.layers.BatchNormalization()(final)
-    final = keras.layers.ReLU()(final)
-    final = keras.layers.MaxPooling2D((2,2), strides=(2,2))(final)
-    final = keras.layers.Dropout(rate=0.2)(final)
 
-    final = keras.layers.Conv2D(16, (3,3), padding="same",activation='relu')(final)
-    final = keras.layers.BatchNormalization()(final)
-    final = keras.layers.ReLU()(final)
-
-
+    final = keras.layers.Reshape((1, 64))(final)
+    final = keras.layers.GRU(64)(final)
     final = keras.layers.Flatten()(final)
+    final = keras.layers.Dropout(0.5)(final)
+    final = keras.layers.Dense(32)(final)
     final = keras.layers.Dense(2)(final)
-    #final = keras.layers.BatchNormalization()(final)
     final = keras.layers.Softmax()(final)
 
     model = keras.Model(inputs=inputdata, outputs=final)
     optimizer = keras.optimizers.Adam(
-        lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=None)
+        lr=0.001, decay=1e-6, epsilon=None)
     model.compile(loss='categorical_crossentropy',
                   optimizer=optimizer,
                   metrics=['accuracy'])
-    # print(model.summary())
+    #print(model.summary())
     return model
 # Train your model.
 def train_challenge_model(data_folder, model_folder, verbose):
@@ -367,9 +387,10 @@ def train_challenge_model(data_folder, model_folder, verbose):
     murmurs = list()
     outcomes = list()
 
+    temp = np.zeros((49, 39, 1))
     for i in range(num_patient_files):
         if verbose >= 2:
-            print('    {}/{}...'.format(i+1, num_patient_files))
+            print('    {}/{}...'.format(i + 1, num_patient_files))
 
         # Load the current patient data and recordings.
         current_patient_data = load_patient_data(patient_files[i])
@@ -377,7 +398,13 @@ def train_challenge_model(data_folder, model_folder, verbose):
 
         # Extract features.
         current_features = get_features(current_patient_data, current_recordings)
-        features.append(current_features)
+        #print(current_features.shape)
+        total = int(len(current_features) / 49)
+        for i in range(total):
+            for a in range(49):
+                for b in range(39):
+                    temp[a, b] = current_features[a + i * 49, b]
+            features.append(temp)
 
         # Extract labels and use one-hot encoding.
         current_murmur = np.zeros(num_murmur_classes, dtype=int)
@@ -385,31 +412,41 @@ def train_challenge_model(data_folder, model_folder, verbose):
         if murmur in murmur_classes:
             j = murmur_classes.index(murmur)
             current_murmur[j] = 1
-        murmurs.append(current_murmur)
+        for i in range(total):
+            murmurs.append(current_murmur)
 
         current_outcome = np.zeros(num_outcome_classes, dtype=int)
         outcome = get_outcome(current_patient_data)
         if outcome in outcome_classes:
             j = outcome_classes.index(outcome)
             current_outcome[j] = 1
-        outcomes.append(current_outcome)
+        for i in range(total):
+            outcomes.append(current_outcome)
 
     features = np.array(features)
+    # features=current_features[0]
+   # print(features.shape)
     murmurs = np.array(murmurs)
+    #print(murmurs.shape)
     outcomes = np.array(outcomes)
-    print(murmurs.shape)
+
+    #murmurs = np.argmax(murmurs, axis=1)
+    #outcomes = np.argmax(outcomes, axis=1)
+
+    #print(features.shape)
     # Train the model.
     if verbose >= 1:
         print('Training model...')
     imputer=0
-    num_epochs = 10
+    num_epochs = 30
     model_1 = build_model_1()
 
     history1 = model_1.fit(features, murmurs,
                            epochs=num_epochs,
-                           batch_size=32,
+                           batch_size=16,
                            validation_split=0.2,
-                           verbose=1)
+                           verbose=1
+                           )
 
     model_1.summary()
 
@@ -417,15 +454,18 @@ def train_challenge_model(data_folder, model_folder, verbose):
 
     history2 = model_2.fit(features, outcomes,
                            epochs=num_epochs,
-                           batch_size=32,
+                           batch_size=16,
                            validation_split=0.2,
-                           verbose=1)
+                           verbose=1
+                           )
 
     model_2.summary()
-
+    model_1.save(model_folder+'/'+'model_1.h5')
+    #model_2 = outcome_classifier
+    model_2.save(model_folder + '/' + 'model_2.h5')
 
     # Save the model.
-    save_challenge_model(model_folder, imputer, murmur_classes, model_1, outcome_classes, model_2)
+    save_challenge_model(model_folder, imputer, murmur_classes, model_folder, outcome_classes, model_folder)
 
     if verbose >= 1:
         print('Done.')
@@ -433,36 +473,49 @@ def train_challenge_model(data_folder, model_folder, verbose):
 # Load your trained model. This function is *required*. You should edit this function to add your code, but do *not* change the
 # arguments of this function.
 def load_challenge_model(model_folder, verbose):
-    filename1 = os.path.join(model_folder, 'model_1.h5')
-    filename3 = os.path.join(model_folder, 'model_2.h5')
     filename2= os.path.join(model_folder, 'model.sav')
-    return  joblib.load(filename2),load_model(filename1),load_model(filename3)
+    return  joblib.load(filename2)
 
+def h5_model_1(model_folder):
+    filename1 = os.path.join(model_folder, 'model_1.h5')
+    return load_model(filename1)
+def h5_model_2(model_folder):
+    filename3 = os.path.join(model_folder, 'model_2.h5')
+    return load_model(filename3)
 # Run your trained model. This function is *required*. You should edit this function to add your code, but do *not* change the
 # arguments of this function.
 def run_challenge_model(model, data, recordings, verbose):
-   # imputer = model[0]['imputer']
-    murmur_classes = model[0]['murmur_classes']
-    murmur_classifier = model[1]
-    outcome_classes = model[0]['outcome_classes']
-    outcome_classifier = model[2]
+    # imputer = model[0]['imputer']
+    murmur_classes = model['murmur_classes']
+    #print(model['murmur_classifier'])
+    murmur_classifier = h5_model_1(model['murmur_classifier'])
+    outcome_classes = model['outcome_classes']
+    outcome_classifier = h5_model_2(model['outcome_classifier'])
 
-
+    temp = np.zeros((49, 39, 1))
     pre_features = list()
     # Load features.
     features = get_features(data, recordings)
-    pre_features.append(features)
-    pre_features = np.array(pre_features)
+    total = int(len(features) / 49)
+    for i in range(total):
+        for a in range(49):
+            for b in range(39):
+                temp[a, b] = features[a + i * 49, b]
+        pre_features.append(temp)
 
+    pre_features = np.array(pre_features)
+    # print(pre_features.shape)
     # Impute missing data.
-    #features = features.reshape(1, -1)
-   # features = imputer.transform(features)
+    # features = features.reshape(1, -1)
+    # features = imputer.transform(features)
 
     # Get classifier probabilities.
     murmur_probabilities = murmur_classifier.predict(pre_features)
-    murmur_probabilities = np.asarray(murmur_probabilities, dtype=np.float32)[0, :]
+    a = np.asarray(murmur_probabilities, dtype=np.float32)
+    murmur_probabilities=np.array([a[:,0].max(),a[:,1].max(),a[:,2].max()])
     outcome_probabilities = outcome_classifier.predict(pre_features)
-    outcome_probabilities = np.asarray(outcome_probabilities, dtype=np.float32)[0, :]
+    b = np.asarray(outcome_probabilities, dtype=np.float32)
+    outcome_probabilities = np.array([b[:, 0].max(), b[:, 1].max()])
 
     # Choose label with highest probability.
     murmur_labels = np.zeros(len(murmur_classes), dtype=np.int_)
@@ -478,7 +531,6 @@ def run_challenge_model(model, data, recordings, verbose):
     probabilities = np.concatenate((murmur_probabilities, outcome_probabilities))
 
     return classes, labels, probabilities
-
 ################################################################################
 #
 # Optional functions. You can change or remove these functions and/or add new functions.
@@ -487,52 +539,68 @@ def run_challenge_model(model, data, recordings, verbose):
 
 # Save your trained model.
 def save_challenge_model(model_folder, imputer, murmur_classes, murmur_classifier, outcome_classes, outcome_classifier):
-    d = {'imputer': imputer, 'murmur_classes': murmur_classes,  'outcome_classes': outcome_classes, }
+    d = {'imputer': imputer, 'murmur_classes': murmur_classes, 'murmur_classifier': model_folder, 'outcome_classes': outcome_classes, 'outcome_classifier': outcome_classifier}
     filename = os.path.join(model_folder, 'model.sav')
-    model_1=murmur_classifier
-    model_1.save(model_folder+'/'+'model_1.h5')
-    model_2 = outcome_classifier
-    model_2.save(model_folder + '/' + 'model_2.h5')
-
     joblib.dump(d, filename, protocol=0)
 
 # Extract features from the data.
 def get_features(data, recordings):
     # Extract recording locations and data. Identify when a location is present, and compute the mean, variance, and skewness of
     # each recording. If there are multiple recordings for one location, then extract features from the last recording.
-    dataset = np.zeros((1024, 256, 1))
-    locations = get_locations(data)
 
-    recording_locations = ['AV', 'MV', 'PV', 'TV']
+    tmp = list()
+    locations = get_locations(data)
+    num_ap = 0
+    #recording_locations = ['AV', 'MV', 'PV', 'TV', 'Phc']
+    recording_locations = ['AV','MV', 'PV', 'TV']
     # recording_locations = ['MV']
     num_recording_locations = len(recording_locations)
     recording_features = np.zeros((num_recording_locations, 4), dtype=float)
+    fs=get_frequency(data)
     num_locations = len(locations)
     num_recordings = len(recordings)
     if num_locations == num_recordings:
         for i in range(num_locations):
             for j in range(num_recording_locations):
                 if compare_strings(locations[i], recording_locations[j]) and np.size(recordings[i]) > 0:
-                    freq1, freq2, bi_spectrum = polycoherence(
-                        recordings[i],
+                    down_sample_audio_data = band_pass_filter(recordings[i], 2, 25, 400, fs)
+                    # 下采样
+                    #down_sample_audio_data = samplerate.resample(recordings[i].T, 1000 / fs,
+                                                                 #converter_type='sinc_best').T
+                    down_sample_audio_data = down_sample_audio_data / np.max(np.abs(down_sample_audio_data))
+                    total_num = math.ceil(len(down_sample_audio_data) / (2000))  # 计算切割次数
+                    for m in range(total_num):
+                        start = m * 2000
+                        # end=start+1250
+                        if start + 2000 > len(down_sample_audio_data):
+                            break
+                        num_ap = num_ap + 1
+                    # print(num_ap)
+                    dataset = np.zeros((49 * num_ap, 39, 1))
 
-                        nfft=1024,
-                        nperseg=256,
-                        noverlap=100,
-                        fs=1000,
-                        norm=None)
-                    bi_spectrum = np.array(abs(bi_spectrum))  # calculate bi_spectrum
-                    bi_spectrum = bi_spectrum.reshape((256, 256, 1))  # 修改尺寸以便于投入神经网络
-                    bi_spectrum = 255 * (bi_spectrum - np.min(bi_spectrum)) / (
-                                np.max(bi_spectrum) - np.min(bi_spectrum))
-                    # temp=temp.append(bi_spectrum.tolist())
-                    # dataset=np.array(temp)
-                    if i>=4:
-                        break
-                    for a in range(256):
-                        for b in range(256):
-                            dataset[a + i * 256, b] = bi_spectrum[a, b]
-                            # print(dataset.shape)
+                    for m in range(num_ap):
+                        start = m * 2000
+                        # end=start+1250
+                        if start + 2000 > len(down_sample_audio_data):
+                            break
+
+                        down_sample_audio_data = down_sample_audio_data[start:start + 2000]
+
+                        mfcc_feat = mfcc(down_sample_audio_data, fs)
+
+                        # fbank_feat = logfbank(down_sample_audio_data,fs)
+                        mf1 = delta(mfcc_feat, 1)  # 一阶差分
+                        mf2 = delta(mfcc_feat, 2)  # 二阶差分
+
+                        mfcc_all = np.hstack((mfcc_feat, mf1, mf2))
+
+                        #print(mfcc_all.shape)
+
+                        for n in range(49):
+                            for w in range(13):
+                                dataset[m * 49, w] = mfcc_all[n, w]
+
+                # print(dataset.shape)
     # dataset = np.delete(dataset, 0, 0)
 
     # recording_features = bi_spectrum.flatten()
