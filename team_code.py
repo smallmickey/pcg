@@ -290,44 +290,7 @@ def plot_polycoherence(freq1, freq2, bicoh):
 def build_model_1():
     inputdata = keras.Input(shape=(49, 39, 1))
 
-    final = keras.layers.Conv2D(32, (3, 3), padding="valid", kernel_initializer='random_uniform')(inputdata)
-    final = keras.layers.PReLU()(final)
-    final = keras.layers.MaxPooling2D((2, 2), strides=(2, 2))(final)
-    final = keras.layers.BatchNormalization()(final)
-
-    final = keras.layers.Conv2D(32, (3, 3), padding="valid")(final)
-    final = keras.layers.PReLU()(final)
-    final = keras.layers.MaxPooling2D((4, 4))(final)
-    final = keras.layers.BatchNormalization()(final)
-
-    final = keras.layers.Conv2D(64, (3, 3), padding="valid")(final)
-    final = keras.layers.ReLU()(final)
-    final = keras.layers.MaxPooling2D((2, 2), strides=(2, 2))(final)
-    final = keras.layers.BatchNormalization()(final)
-
-    final = keras.layers.Reshape((1,64))(final)
-    final = keras.layers.GRU(64)(final)
-    final = keras.layers.Flatten()(final)
-    final = keras.layers.Dropout(0.5)(final)
-    final = keras.layers.Dense(32)(final)
-    final = keras.layers.Dense(3)(final)
-    final = keras.layers.Softmax()(final)
-
-    model = keras.Model(inputs=inputdata, outputs=final)
-    optimizer = keras.optimizers.Adam(
-        lr=0.001, decay=1e-6, epsilon=None)
-    model.compile(loss='categorical_crossentropy',
-                  optimizer=optimizer,
-                  metrics=['accuracy'])
-    print(model.summary())
-
-
-
-    return model
-def build_model_2():
-    inputdata = keras.Input(shape=(49, 39, 1))
-
-    final = keras.layers.Conv2D(32, (3, 3), padding="valid", kernel_initializer='random_uniform')(inputdata)
+    final = keras.layers.Conv2D(32, (3, 3), padding="valid", kernel_initializer='he_normal')(inputdata)
     final = keras.layers.PReLU()(final)
     final = keras.layers.MaxPooling2D((2, 2), strides=(2, 2))(final)
     final = keras.layers.BatchNormalization()(final)
@@ -345,14 +308,51 @@ def build_model_2():
     final = keras.layers.Reshape((1, 64))(final)
     final = keras.layers.GRU(64)(final)
     final = keras.layers.Flatten()(final)
-    final = keras.layers.Dropout(0.5)(final)
+    final = keras.layers.Dropout(0.2)(final)
+    final = keras.layers.Dense(32)(final)
+    final = keras.layers.Dense(3)(final)
+    final = keras.layers.Softmax()(final)
+
+    model = keras.Model(inputs=inputdata, outputs=final)
+    optimizer = keras.optimizers.Adam(
+        lr=0.0001, decay=1e-6, epsilon=None)
+    model.compile(loss='categorical_crossentropy',
+                  optimizer=optimizer,
+                  metrics=['accuracy'])
+    print(model.summary())
+
+
+
+    return model
+def build_model_2():
+    inputdata = keras.Input(shape=(49, 39, 1))
+
+    final = keras.layers.Conv2D(32, (3, 3), padding="valid", kernel_initializer='he_normal')(inputdata)
+    final = keras.layers.PReLU()(final)
+    final = keras.layers.MaxPooling2D((2, 2), strides=(2, 2))(final)
+    final = keras.layers.BatchNormalization()(final)
+
+    final = keras.layers.Conv2D(32, (3, 3), padding="valid")(final)
+    final = keras.layers.PReLU()(final)
+    final = keras.layers.MaxPooling2D((4, 4))(final)
+    final = keras.layers.BatchNormalization()(final)
+
+    final = keras.layers.Conv2D(64, (3, 3), padding="valid")(final)
+    final = keras.layers.ReLU()(final)
+    final = keras.layers.MaxPooling2D((2, 2), strides=(2, 2))(final)
+    final = keras.layers.BatchNormalization()(final)
+
+    final = keras.layers.Reshape((1, 64))(final)
+    final = keras.layers.GRU(64)(final)
+    final = keras.layers.Flatten()(final)
+    final = keras.layers.Dropout(0.2)(final)
     final = keras.layers.Dense(32)(final)
     final = keras.layers.Dense(2)(final)
     final = keras.layers.Softmax()(final)
 
     model = keras.Model(inputs=inputdata, outputs=final)
     optimizer = keras.optimizers.Adam(
-        lr=0.001, decay=1e-6, epsilon=None)
+        lr=0.0001, decay=1e-6, epsilon=None)
     model.compile(loss='categorical_crossentropy',
                   optimizer=optimizer,
                   metrics=['accuracy'])
@@ -438,10 +438,10 @@ def train_challenge_model(data_folder, model_folder, verbose):
     if verbose >= 1:
         print('Training model...')
     imputer=0
-    num_epochs = 30
+    num_epochs = 40
     model_1 = build_model_1()
 
-    history1 = model_1.fit(features, murmurs,
+    h1 = model_1.fit(features, murmurs,
                            epochs=num_epochs,
                            batch_size=16,
                            validation_split=0.2,
@@ -452,7 +452,7 @@ def train_challenge_model(data_folder, model_folder, verbose):
 
     model_2 = build_model_2()
 
-    history2 = model_2.fit(features, outcomes,
+    h2 = model_2.fit(features, outcomes,
                            epochs=num_epochs,
                            batch_size=16,
                            validation_split=0.2,
@@ -460,6 +460,26 @@ def train_challenge_model(data_folder, model_folder, verbose):
                            )
 
     model_2.summary()
+
+
+
+
+
+    fig1=plt.figure(figsize=(10, 5))
+    plt.plot(h1.history['val_loss'])
+    plt.plot(h1.history['loss'])
+    plt.legend(['Train', "Validation"])
+    plt.show()
+    fig1.savefig('loss1.png')
+
+    fig2=plt.figure(figsize=(10, 5))
+    plt.plot(h2.history['val_loss'])
+    plt.plot(h2.history['loss'])
+    plt.legend(['Train', "Validation"])
+    plt.show()
+    fig2.savefig('loss2.png')
+
+
     model_1.save(model_folder+'/'+'model_1.h5')
     #model_2 = outcome_classifier
     model_2.save(model_folder + '/' + 'model_2.h5')
@@ -551,8 +571,8 @@ def get_features(data, recordings):
     tmp = list()
     locations = get_locations(data)
     num_ap = 0
-    #recording_locations = ['AV', 'MV', 'PV', 'TV', 'Phc']
-    recording_locations = ['AV','MV', 'PV', 'TV']
+    recording_locations = ['AV', 'MV', 'PV', 'TV', 'Phc']
+    #recording_locations = ['AV','MV', 'PV', 'TV']
     # recording_locations = ['MV']
     num_recording_locations = len(recording_locations)
     recording_features = np.zeros((num_recording_locations, 4), dtype=float)
